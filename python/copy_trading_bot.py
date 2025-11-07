@@ -29,7 +29,9 @@ class CopyTradingBot:
         self.config = config
         self.client = PolymarketClient(config)
         self.processed_trade_ids: Set[str] = set()
-        self.last_check_timestamp = time.time() * 1000
+        # Inicializar timestamp atrás en el tiempo para detectar trades recientes al inicio
+        # Retroceder el doble del max_trade_age para asegurar que detecte trades recientes
+        self.last_check_timestamp = (time.time() * 1000) - (config.max_trade_age_minutes * 60 * 1000 * 2)
         self.is_running = False
         self.stats = BotStats(start_time=time.time())
         self.logger = get_logger()
@@ -65,6 +67,7 @@ class CopyTradingBot:
         print(f"  Tamaño min/max: {Fore.YELLOW}${self.config.min_order_size} - ${self.config.max_order_size}{Style.RESET_ALL}")
         print(f"  Slippage máximo: {Fore.YELLOW}{self.config.max_slippage * 100:.1f}%{Style.RESET_ALL}")
         print(f"  Intervalo de polling: {Fore.YELLOW}{self.config.poll_interval}ms{Style.RESET_ALL}")
+        print(f"  Max edad de trades: {Fore.YELLOW}{self.config.max_trade_age_minutes} minutos{Style.RESET_ALL}")
 
         if self.config.dry_run:
             print(f"  Modo: {Fore.RED}{Style.BRIGHT}DRY RUN (Simulación){Style.RESET_ALL}")
@@ -140,7 +143,15 @@ class CopyTradingBot:
         current_time = time.time() * 1000
         max_age = self.config.max_trade_age_minutes * 60 * 1000
 
+        self.logger.debug(f"Tiempo actual: {current_time}")
+        self.logger.debug(f"Último check: {self.last_check_timestamp}")
+        self.logger.debug(f"Max age permitido: {max_age / 1000 / 60} minutos")
+
         new_trades = []
+        skipped_by_id = 0
+        skipped_by_age = 0
+        skipped_by_timestamp = 0
+
         for trade in trades:
             try:
                 # Obtener ID del trade (puede estar en diferentes campos)
@@ -151,6 +162,8 @@ class CopyTradingBot:
 
                 # Ya procesado
                 if trade_id in self.processed_trade_ids:
+                    skipped_by_id += 1
+                    self.logger.debug(f"Trade {trade_id[:8]}... ya procesado anteriormente")
                     continue
 
                 # Obtener timestamp (puede estar en diferentes campos o formatos)
@@ -173,13 +186,47 @@ class CopyTradingBot:
                         self.logger.debug(f"No se pudo parsear timestamp: {timestamp}")
                         continue
 
+                # Calcular edad del trade
+                trade_age_ms = current_time - timestamp
+                trade_age_minutes = trade_age_ms / 1000 / 60
+
                 # Verificar antigüedad
-                if current_time - timestamp < max_age and timestamp > self.last_check_timestamp:
-                    new_trades.append(trade)
+                if trade_age_ms >= max_age:
+                    skipped_by_age += 1
+                    self.logger.debug(
+                        f"Trade {trade_id[:8]}... muy antiguo "
+                        f"(edad: {trade_age_minutes:.1f}min, max: {max_age / 1000 / 60}min)"
+                    )
+                    continue
+
+                if timestamp <= self.last_check_timestamp:
+                    skipped_by_timestamp += 1
+                    self.logger.debug(
+                        f"Trade {trade_id[:8]}... ya fue verificado en check anterior "
+                        f"(timestamp: {timestamp}, último check: {self.last_check_timestamp})"
+                    )
+                    continue
+
+                # Trade es nuevo y reciente
+                self.logger.debug(
+                    f"Trade {trade_id[:8]}... es NUEVO y RECIENTE (edad: {trade_age_minutes:.1f}min)"
+                )
+                new_trades.append(trade)
 
             except Exception as e:
                 self.logger.debug(f"Error procesando trade: {e}")
                 continue
+
+        # Resumen del filtrado
+        if len(trades) > 0:
+            self.logger.debug("=" * 50)
+            self.logger.debug(f"RESUMEN DEL FILTRADO:")
+            self.logger.debug(f"  Total trades obtenidos: {len(trades)}")
+            self.logger.debug(f"  Omitidos (ya procesados): {skipped_by_id}")
+            self.logger.debug(f"  Omitidos (muy antiguos): {skipped_by_age}")
+            self.logger.debug(f"  Omitidos (ya verificados): {skipped_by_timestamp}")
+            self.logger.debug(f"  Trades NUEVOS detectados: {len(new_trades)}")
+            self.logger.debug("=" * 50)
 
         if new_trades:
             self.logger.info(
