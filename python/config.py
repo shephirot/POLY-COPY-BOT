@@ -132,5 +132,11 @@ def load_config() -> BotConfig:
         log_error('MAX_SLIPPAGE debe estar entre 0 y 1')
         exit(1)
 
+    # Información si está usando su propia wallet
+    if config.target_trader_address.lower() == config.your_polymarket_address.lower():
+        from logger import log_warning
+        log_warning('MODO TEST: Estas monitoreando tus propios trades')
+        log_warning('Esto es util para testear el bot. Haz un trade en Polymarket para verlo funcionar.')
+
     logger.info('✓ Configuración cargada correctamente')
     return config
