@@ -1,12 +1,32 @@
 """
 Sistema de logging profesional con colores
+Compatible con Windows y Unix
 """
 import logging
+import sys
+import platform
 from datetime import datetime
 from colorama import Fore, Style, init
 
-# Inicializar colorama
-init(autoreset=True)
+# Inicializar colorama para Windows
+init(autoreset=True, strip=False)
+
+# Detectar si estamos en Windows
+IS_WINDOWS = platform.system() == 'Windows'
+
+# Símbolos compatibles con Windows
+if IS_WINDOWS:
+    SYMBOL_SUCCESS = '[OK]'
+    SYMBOL_ERROR = '[X]'
+    SYMBOL_WARNING = '[!]'
+    SYMBOL_TRADE = '[TRADE]'
+    SYMBOL_STATS = '[STATS]'
+else:
+    SYMBOL_SUCCESS = '✓'
+    SYMBOL_ERROR = '✗'
+    SYMBOL_WARNING = '⚠'
+    SYMBOL_TRADE = '💱'
+    SYMBOL_STATS = '📊'
 
 class ColoredFormatter(logging.Formatter):
     """Formatter personalizado con colores"""
@@ -27,13 +47,52 @@ class ColoredFormatter(logging.Formatter):
 
         return super().format(record)
 
+class SafeFileHandler(logging.FileHandler):
+    """File handler que maneja encoding correctamente"""
+
+    def __init__(self, filename, mode='a', encoding='utf-8', delay=False):
+        super().__init__(filename, mode, encoding, delay)
+
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except UnicodeEncodeError:
+            # Si falla, intentar sin caracteres especiales
+            record.msg = self._remove_special_chars(str(record.msg))
+            super().emit(record)
+
+    def _remove_special_chars(self, text):
+        """Remueve caracteres Unicode problemáticos"""
+        replacements = {
+            '✓': '[OK]',
+            '✗': '[X]',
+            '⚠': '[!]',
+            '💱': '[TRADE]',
+            '📊': '[STATS]',
+            '🚀': '[START]',
+            '📥': '[IN]',
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+        return text
+
 def setup_logger(log_level='INFO'):
     """Configura el logger principal"""
     logger = logging.getLogger('PolymarketBot')
     logger.setLevel(getattr(logging, log_level.upper()))
 
-    # Handler para consola
-    console_handler = logging.StreamHandler()
+    # Limpiar handlers existentes
+    logger.handlers.clear()
+
+    # Handler para consola con encoding UTF-8
+    if IS_WINDOWS:
+        # En Windows, intentar configurar UTF-8
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except:
+            pass
+
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG)
 
     # Formato
@@ -43,8 +102,8 @@ def setup_logger(log_level='INFO'):
     )
     console_handler.setFormatter(formatter)
 
-    # Handler para archivo
-    file_handler = logging.FileHandler('bot.log')
+    # Handler para archivo con encoding UTF-8
+    file_handler = SafeFileHandler('bot.log', encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(
         '%(asctime)s [%(levelname)s] %(message)s',
@@ -70,22 +129,24 @@ def get_logger():
 
 def log_success(message):
     """Log de éxito con símbolo verde"""
-    get_logger().info(f"{Fore.GREEN}✓ {message}{Style.RESET_ALL}")
+    get_logger().info(f"{Fore.GREEN}{SYMBOL_SUCCESS} {message}{Style.RESET_ALL}")
 
 def log_error(message, error=None):
     """Log de error con símbolo rojo"""
-    get_logger().error(f"{Fore.RED}✗ {message}{Style.RESET_ALL}")
+    get_logger().error(f"{Fore.RED}{SYMBOL_ERROR} {message}{Style.RESET_ALL}")
     if error:
-        get_logger().error(f"{Fore.RED}{str(error)}{Style.RESET_ALL}")
+        error_msg = str(error)
+        # Limpiar el mensaje de error si tiene caracteres problemáticos
+        get_logger().error(f"{Fore.RED}{error_msg}{Style.RESET_ALL}")
 
 def log_warning(message):
     """Log de advertencia con símbolo amarillo"""
-    get_logger().warning(f"{Fore.YELLOW}⚠ {message}{Style.RESET_ALL}")
+    get_logger().warning(f"{Fore.YELLOW}{SYMBOL_WARNING} {message}{Style.RESET_ALL}")
 
 def log_trade(message):
     """Log de trade con símbolo cyan"""
-    get_logger().info(f"{Fore.CYAN}💱 {message}{Style.RESET_ALL}")
+    get_logger().info(f"{Fore.CYAN}{SYMBOL_TRADE} {message}{Style.RESET_ALL}")
 
 def log_stats(message):
     """Log de estadísticas con símbolo magenta"""
-    get_logger().info(f"{Fore.MAGENTA}📊 {message}{Style.RESET_ALL}")
+    get_logger().info(f"{Fore.MAGENTA}{SYMBOL_STATS} {message}{Style.RESET_ALL}")
