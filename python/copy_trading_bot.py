@@ -91,6 +91,7 @@ class CopyTradingBot:
                 break
             except Exception as e:
                 log_error('Error en el loop principal', e)
+                self.logger.debug(f"Detalles del error: {type(e).__name__}: {str(e)}")
                 time.sleep(5)
 
     def stop(self):
@@ -107,18 +108,57 @@ class CopyTradingBot:
         )
 
         if not trades:
+            self.logger.debug("No se obtuvieron trades")
             return
 
-        # Filtrar trades nuevos
+        # Debug: mostrar estructura del primer trade
+        if trades and len(trades) > 0:
+            self.logger.debug(f"Estructura del primer trade: {list(trades[0].keys())}")
+
+        # Filtrar trades nuevos con manejo robusto de campos
         current_time = time.time() * 1000
         max_age = self.config.max_trade_age_minutes * 60 * 1000
 
-        new_trades = [
-            trade for trade in trades
-            if (trade['id'] not in self.processed_trade_ids and
-                current_time - trade['timestamp'] < max_age and
-                trade['timestamp'] > self.last_check_timestamp)
-        ]
+        new_trades = []
+        for trade in trades:
+            try:
+                # Obtener ID del trade (puede estar en diferentes campos)
+                trade_id = trade.get('id') or trade.get('trade_id') or trade.get('tradeId')
+                if not trade_id:
+                    self.logger.debug("Trade sin ID, saltando...")
+                    continue
+
+                # Ya procesado
+                if trade_id in self.processed_trade_ids:
+                    continue
+
+                # Obtener timestamp (puede estar en diferentes campos o formatos)
+                timestamp = trade.get('timestamp') or trade.get('created_at') or trade.get('time')
+
+                if timestamp is None:
+                    # Si no tiene timestamp, asumimos que es reciente
+                    self.logger.debug(f"Trade {trade_id[:8]}... sin timestamp, asumiendo reciente")
+                    new_trades.append(trade)
+                    continue
+
+                # Convertir timestamp si es necesario
+                if isinstance(timestamp, str):
+                    # Intentar parsear timestamp string
+                    try:
+                        from dateutil import parser
+                        dt = parser.parse(timestamp)
+                        timestamp = int(dt.timestamp() * 1000)
+                    except:
+                        self.logger.debug(f"No se pudo parsear timestamp: {timestamp}")
+                        continue
+
+                # Verificar antigüedad
+                if current_time - timestamp < max_age and timestamp > self.last_check_timestamp:
+                    new_trades.append(trade)
+
+            except Exception as e:
+                self.logger.debug(f"Error procesando trade: {e}")
+                continue
 
         if new_trades:
             self.logger.info(
@@ -128,16 +168,23 @@ class CopyTradingBot:
 
             for trade in new_trades:
                 self.process_trade(trade)
-                self.processed_trade_ids.add(trade['id'])
+                trade_id = trade.get('id') or trade.get('trade_id') or trade.get('tradeId')
+                if trade_id:
+                    self.processed_trade_ids.add(trade_id)
 
         self.last_check_timestamp = current_time
 
     def process_trade(self, trade: Dict):
         """Procesa un trade individual"""
         try:
+            # Obtener datos del trade con valores por defecto
+            side = trade.get('side', 'UNKNOWN')
+            size = trade.get('size', trade.get('amount', '0'))
+            price = trade.get('price', '0')
+
             log_trade(
-                f"Trade detectado: {Fore.CYAN}{trade['side']}{Style.RESET_ALL} "
-                f"{trade['size']} @ ${trade['price']}"
+                f"Trade detectado: {Fore.CYAN}{side}{Style.RESET_ALL} "
+                f"{size} @ ${price}"
             )
 
             # Validar filtros
@@ -146,7 +193,13 @@ class CopyTradingBot:
                 return
 
             # Obtener información del mercado
-            market = self.client.get_market(trade['market'])
+            market_id = trade.get('market') or trade.get('market_id') or trade.get('condition_id')
+            if not market_id:
+                log_error('  ↳ Trade sin información de mercado')
+                self.stats.total_trades_failed += 1
+                return
+
+            market = self.client.get_market(market_id)
             if not market:
                 log_error('  ↳ No se pudo obtener información del mercado')
                 self.stats.total_trades_failed += 1
@@ -172,86 +225,97 @@ class CopyTradingBot:
 
         except Exception as e:
             log_error('Error al procesar trade', e)
+            self.logger.debug(f"Datos del trade: {trade}")
             self.stats.total_trades_failed += 1
 
     def should_copy_trade(self, trade: Dict) -> bool:
         """Valida si un trade debe ser copiado según los filtros"""
         # Filtro de lados (BUY/SELL)
-        if trade['side'] not in self.config.copy_sides:
+        side = trade.get('side', '')
+        if side and side not in self.config.copy_sides:
             return False
 
         # Whitelist de mercados
-        if (self.config.whitelist_markets and
-            len(self.config.whitelist_markets) > 0):
-            if trade['market'] not in self.config.whitelist_markets:
+        market_id = trade.get('market') or trade.get('market_id') or trade.get('condition_id')
+        if (self.config.whitelistMarkets and
+            len(self.config.whitelistMarkets) > 0):
+            if market_id not in self.config.whitelistMarkets:
                 return False
 
         # Blacklist de mercados
-        if (self.config.blacklist_markets and
-            len(self.config.blacklist_markets) > 0):
-            if trade['market'] in self.config.blacklist_markets:
+        if (self.config.blacklistMarkets and
+            len(self.config.blacklistMarkets) > 0):
+            if market_id in self.config.blacklistMarkets:
                 return False
 
         return True
 
     def prepare_order(self, trade: Dict, market: Dict) -> Optional[Dict]:
         """Prepara una orden para ejecutar basándose en el trade original"""
-        original_size = float(trade['size'])
-        price = float(trade['price'])
+        try:
+            original_size = float(trade.get('size', trade.get('amount', 0)))
+            price = float(trade.get('price', 0))
 
-        # Calcular el tamaño ajustado según el modo
-        if self.config.copy_mode == 'percentage':
-            # Modo porcentaje: copiar un % del tamaño del trader
-            adjusted_size = original_size * self.config.copy_size_multiplier
-            order_value = adjusted_size * price
+            if original_size == 0 or price == 0:
+                self.logger.debug("Trade con size o price = 0, saltando")
+                return None
+
+            # Calcular el tamaño ajustado según el modo
+            if self.config.copy_mode == 'percentage':
+                # Modo porcentaje: copiar un % del tamaño del trader
+                adjusted_size = original_size * self.config.copy_size_multiplier
+                order_value = adjusted_size * price
+                self.logger.debug(
+                    f"  ↳ Modo porcentaje: {original_size} × {self.config.copy_size_multiplier} "
+                    f"= {adjusted_size:.2f} tokens"
+                )
+            else:
+                # Modo fixed: usar un stake fijo en USDC
+                order_value = self.config.fixed_stake_size
+                adjusted_size = order_value / price
+                self.logger.debug(
+                    f"  ↳ Modo stake fijo: ${self.config.fixed_stake_size} ÷ ${price} "
+                    f"= {adjusted_size:.2f} tokens"
+                )
+
+            # Validar límites de tamaño
+            if order_value < self.config.min_order_size:
+                self.logger.debug(
+                    f"  ↳ Orden muy pequeña: ${order_value:.2f} "
+                    f"(mínimo: ${self.config.min_order_size})"
+                )
+                return None
+
+            if order_value > self.config.max_order_size:
+                self.logger.debug(
+                    f"  ↳ Orden muy grande: ${order_value:.2f}, "
+                    f"ajustando a máximo: ${self.config.max_order_size}"
+                )
+                adjusted_size = self.config.max_order_size / price
+                order_value = self.config.max_order_size
+
             self.logger.debug(
-                f"  ↳ Modo porcentaje: {original_size} × {self.config.copy_size_multiplier} "
-                f"= {adjusted_size:.2f} tokens"
-            )
-        else:
-            # Modo fixed: usar un stake fijo en USDC
-            order_value = self.config.fixed_stake_size
-            adjusted_size = order_value / price
-            self.logger.debug(
-                f"  ↳ Modo stake fijo: ${self.config.fixed_stake_size} ÷ ${price} "
-                f"= {adjusted_size:.2f} tokens"
+                f"  ↳ Orden final: {adjusted_size:.2f} tokens @ ${price} = ${order_value:.2f}"
             )
 
-        # Validar límites de tamaño
-        if order_value < self.config.min_order_size:
-            self.logger.debug(
-                f"  ↳ Orden muy pequeña: ${order_value:.2f} "
-                f"(mínimo: ${self.config.min_order_size})"
-            )
+            return {
+                'token_id': trade.get('asset_id') or trade.get('token_id'),
+                'price': price,
+                'side': trade.get('side', 'BUY'),
+                'size': adjusted_size,
+                'market': market,
+                'original_trade': trade
+            }
+        except Exception as e:
+            self.logger.debug(f"Error en prepare_order: {e}")
             return None
-
-        if order_value > self.config.max_order_size:
-            self.logger.debug(
-                f"  ↳ Orden muy grande: ${order_value:.2f}, "
-                f"ajustando a máximo: ${self.config.max_order_size}"
-            )
-            adjusted_size = self.config.max_order_size / price
-            order_value = self.config.max_order_size
-
-        self.logger.debug(
-            f"  ↳ Orden final: {adjusted_size:.2f} tokens @ ${price} = ${order_value:.2f}"
-        )
-
-        return {
-            'token_id': trade['asset_id'],
-            'price': price,
-            'side': trade['side'],
-            'size': adjusted_size,
-            'market': market,
-            'original_trade': trade
-        }
 
     def execute_order(self, order: Dict) -> Dict:
         """Ejecuta una orden con reintentos"""
         result = {
             'success': False,
             'timestamp': time.time(),
-            'original_trade_id': order['original_trade']['id']
+            'original_trade_id': order['original_trade'].get('id', 'unknown')
         }
 
         # Modo dry run
