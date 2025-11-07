@@ -158,19 +158,40 @@ def main():
     print(f"{Style.BRIGHT}1. Validando direcciones y claves...{Style.RESET_ALL}")
     print()
 
-    target_address = os.getenv('TARGET_TRADER_ADDRESS', '')
+    target_addresses_raw = os.getenv('TARGET_TRADER_ADDRESS', '')
+    target_addresses = [addr.strip() for addr in target_addresses_raw.split(',') if addr.strip()]
     your_address = os.getenv('YOUR_POLYMARKET_ADDRESS', '')
     private_key = os.getenv('YOUR_PRIVATE_KEY', '')
 
     valid = True
 
-    valid &= validate_address(target_address, 'TARGET_TRADER_ADDRESS')
+    # Validar cada dirección de trader
+    if not target_addresses:
+        print(f"{Fore.RED}✗ FALTA: TARGET_TRADER_ADDRESS no está configurado{Style.RESET_ALL}")
+        valid = False
+    else:
+        if len(target_addresses) == 1:
+            print(f"{Fore.CYAN}Modo: 1 trader{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.CYAN}Modo: {len(target_addresses)} traders (multi-wallet){Style.RESET_ALL}")
+        print()
+
+        for i, addr in enumerate(target_addresses, 1):
+            if len(target_addresses) > 1:
+                print(f"  Trader #{i}:")
+            valid &= validate_address(addr, f'TARGET_TRADER_ADDRESS[{i}]' if len(target_addresses) > 1 else 'TARGET_TRADER_ADDRESS')
+
+        print()
+
     valid &= validate_address(your_address, 'YOUR_POLYMARKET_ADDRESS')
     valid &= validate_private_key(private_key)
 
     # Verificar modo auto-test
-    if target_address and your_address:
-        check_self_test_mode(target_address, your_address)
+    if target_addresses and your_address:
+        for target_address in target_addresses:
+            if target_address.lower() == your_address.lower():
+                check_self_test_mode(target_address, your_address)
+                break
 
     print()
     print(f"{Style.BRIGHT}2. Validando configuración de trading...{Style.RESET_ALL}")

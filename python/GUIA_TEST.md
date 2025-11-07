@@ -27,9 +27,13 @@ nano ../.env
 
 ```env
 # USA TU MISMA DIRECCIÓN EN AMBOS CAMPOS:
+# Nota: Puedes poner una sola dirección o varias separadas por comas
 TARGET_TRADER_ADDRESS=0xTU_DIRECCION_AQUI
 YOUR_POLYMARKET_ADDRESS=0xTU_DIRECCION_AQUI
 YOUR_PRIVATE_KEY=0xTU_CLAVE_PRIVADA_AQUI
+
+# O para copiar MÚLTIPLES wallets (incluyendo la tuya para testing):
+# TARGET_TRADER_ADDRESS=0xTU_DIRECCION,0xOTRA_DIRECCION,0xTERCERA_DIRECCION
 
 # IMPORTANTE: Activar modo DRY RUN para pruebas seguras
 DRY_RUN=true

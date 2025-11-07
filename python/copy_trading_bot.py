@@ -45,7 +45,14 @@ class CopyTradingBot:
 
         print()
         print(f"{Style.BRIGHT}Configuración:{Style.RESET_ALL}")
-        print(f"  Trader objetivo: {Fore.YELLOW}{self.config.target_trader_address[:10]}...{Style.RESET_ALL}")
+
+        if len(self.config.target_trader_addresses) == 1:
+            print(f"  Trader objetivo: {Fore.YELLOW}{self.config.target_trader_addresses[0][:10]}...{Style.RESET_ALL}")
+        else:
+            print(f"  Traders objetivo: {Fore.YELLOW}{len(self.config.target_trader_addresses)} traders{Style.RESET_ALL}")
+            for i, addr in enumerate(self.config.target_trader_addresses, 1):
+                print(f"    {i}. {Fore.YELLOW}{addr[:10]}...{addr[-8:]}{Style.RESET_ALL}")
+
         print(f"  Tu dirección: {Fore.YELLOW}{self.config.your_polymarket_address[:10]}...{Style.RESET_ALL}")
 
         if self.config.copy_mode == 'percentage':
@@ -102,18 +109,32 @@ class CopyTradingBot:
         self.print_stats()
 
     def check_for_new_trades(self):
-        """Verifica si hay nuevos trades del trader objetivo"""
-        trades = self.client.get_trader_trades(
-            self.config.target_trader_address, 50
-        )
+        """Verifica si hay nuevos trades de los traders objetivo"""
+        all_trades = []
 
-        if not trades:
-            self.logger.debug("No se obtuvieron trades")
+        # Obtener trades de cada trader
+        for trader_address in self.config.target_trader_addresses:
+            self.logger.debug(f"Consultando trades de {trader_address[:10]}...")
+            trades = self.client.get_trader_trades(trader_address, 50)
+
+            if trades:
+                # Agregar información del trader a cada trade
+                for trade in trades:
+                    trade['_trader_address'] = trader_address
+                all_trades.extend(trades)
+                self.logger.debug(f"  → Obtenidos {len(trades)} trades")
+
+        if not all_trades:
+            self.logger.debug("No se obtuvieron trades de ningún trader")
             return
 
         # Debug: mostrar estructura del primer trade
-        if trades and len(trades) > 0:
-            self.logger.debug(f"Estructura del primer trade: {list(trades[0].keys())}")
+        if all_trades and len(all_trades) > 0:
+            self.logger.debug(f"Total de trades obtenidos: {len(all_trades)}")
+            self.logger.debug(f"Estructura del primer trade: {list(all_trades[0].keys())}")
+
+        # Usar all_trades en lugar de trades
+        trades = all_trades
 
         # Filtrar trades nuevos con manejo robusto de campos
         current_time = time.time() * 1000
@@ -181,9 +202,15 @@ class CopyTradingBot:
             side = trade.get('side', 'UNKNOWN')
             size = trade.get('size', trade.get('amount', '0'))
             price = trade.get('price', '0')
+            trader_addr = trade.get('_trader_address', 'unknown')
+
+            # Mostrar información del trader si hay múltiples
+            trader_info = ""
+            if len(self.config.target_trader_addresses) > 1:
+                trader_info = f" [{Fore.MAGENTA}{trader_addr[:8]}...{Style.RESET_ALL}]"
 
             log_trade(
-                f"Trade detectado: {Fore.CYAN}{side}{Style.RESET_ALL} "
+                f"Trade detectado{trader_info}: {Fore.CYAN}{side}{Style.RESET_ALL} "
                 f"{size} @ ${price}"
             )
 

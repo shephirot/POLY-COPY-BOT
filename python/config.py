@@ -14,7 +14,7 @@ load_dotenv()
 class BotConfig:
     """Configuración del bot"""
     # Credenciales
-    target_trader_address: str
+    target_trader_addresses: List[str]  # Lista de direcciones a copiar
     your_polymarket_address: str
     your_private_key: str
 
@@ -65,6 +65,23 @@ def load_config() -> BotConfig:
         log_error("Copia .env.example a .env y configura las variables necesarias")
         exit(1)
 
+    # Parsear direcciones de traders (puede ser una o varias separadas por coma)
+    target_addresses_raw = os.getenv('TARGET_TRADER_ADDRESS', '')
+    target_addresses = [addr.strip() for addr in target_addresses_raw.split(',') if addr.strip()]
+
+    if not target_addresses:
+        log_error("TARGET_TRADER_ADDRESS está vacío")
+        exit(1)
+
+    # Validar formato de direcciones
+    for addr in target_addresses:
+        if not addr.startswith('0x') or len(addr) != 42:
+            log_error(f"Dirección inválida: {addr}")
+            log_error("Las direcciones deben empezar con 0x y tener 42 caracteres")
+            exit(1)
+
+    logger.info(f'Se monitorearan {len(target_addresses)} trader(s)')
+
     # Parsear filtros
     blacklist_markets = None
     if os.getenv('BLACKLIST_MARKETS'):
@@ -85,7 +102,7 @@ def load_config() -> BotConfig:
         exit(1)
 
     config = BotConfig(
-        target_trader_address=os.getenv('TARGET_TRADER_ADDRESS'),
+        target_trader_addresses=target_addresses,
         your_polymarket_address=os.getenv('YOUR_POLYMARKET_ADDRESS'),
         your_private_key=os.getenv('YOUR_PRIVATE_KEY'),
 
@@ -133,7 +150,7 @@ def load_config() -> BotConfig:
         exit(1)
 
     # Información si está usando su propia wallet
-    if config.target_trader_address.lower() == config.your_polymarket_address.lower():
+    if config.your_polymarket_address.lower() in [addr.lower() for addr in config.target_trader_addresses]:
         from logger import log_warning
         log_warning('MODO TEST: Estas monitoreando tus propios trades')
         log_warning('Esto es util para testear el bot. Haz un trade en Polymarket para verlo funcionar.')

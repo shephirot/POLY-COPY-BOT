@@ -58,6 +58,23 @@ python main.py
 
 ¡Ya está! No hay paso de compilación.
 
+## 🎯 Copiar Múltiples Wallets
+
+**NUEVO:** Ahora puedes copiar varios traders simultáneamente!
+
+```env
+# En .env, separa direcciones con comas:
+TARGET_TRADER_ADDRESS=0xtrader1...,0xtrader2...,0xtrader3...
+```
+
+**Ventajas:**
+- ✅ Diversificación automática
+- ✅ Más oportunidades de trading
+- ✅ Menor riesgo individual
+- ✅ Un solo bot para todo
+
+**Ver guía completa:** [MULTI_WALLET.md](MULTI_WALLET.md)
+
 ## ✅ Validar Configuración (RECOMENDADO)
 
 Antes de ejecutar el bot, valida tu configuración:
@@ -395,6 +412,7 @@ sudo systemctl start polybot
 ## 📚 Recursos
 
 ### Documentación del Bot
+- [MULTI_WALLET.md](MULTI_WALLET.md) - **NUEVO:** Copiar múltiples wallets simultáneamente
 - [GUIA_TEST.md](GUIA_TEST.md) - Cómo probar el bot con tu propia wallet
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Solución de problemas comunes
 - [MODOS_COPIADO.md](../MODOS_COPIADO.md) - Guía de modos (Porcentaje vs Fijo)
