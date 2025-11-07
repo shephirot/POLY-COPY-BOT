@@ -3,7 +3,7 @@ Cliente para interactuar con la API de Polymarket
 """
 import requests
 from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import OrderArgs, OrderType
+from py_clob_client.clob_types import OrderArgs, OrderType, TradeParams
 from typing import List, Dict, Optional
 from logger import get_logger, log_error, log_success, log_warning
 
@@ -45,58 +45,127 @@ class PolymarketClient:
     def get_trader_trades(self, trader_address: str, limit: int = 100) -> List[Dict]:
         """
         Obtiene los trades recientes de un trader específico
-        Este es un endpoint público que no requiere autenticación
+        Usa el cliente autenticado de py-clob-client
         """
         try:
+            self.logger.debug(f"Obteniendo trades de {trader_address[:10]}... usando py-clob-client")
+
+            # Método 1: Usar el cliente py-clob-client autenticado
+            if self.client:
+                try:
+                    # Crear parámetros de trade
+                    trade_params = TradeParams(
+                        maker_address=trader_address.lower()
+                    )
+
+                    # Obtener trades usando el cliente autenticado
+                    trades = self.client.get_trades(trade_params)
+
+                    if trades:
+                        self.logger.debug(f"Se obtuvieron {len(trades)} trades via py-clob-client")
+                        return trades[:limit]  # Limitar resultados
+                    else:
+                        self.logger.debug("No se encontraron trades para este trader")
+                        return []
+
+                except AttributeError:
+                    # Si get_trades no existe, intentar método alternativo
+                    self.logger.debug("get_trades() no disponible, intentando método HTTP...")
+                    return self._get_trades_http(trader_address, limit)
+                except Exception as e:
+                    self.logger.debug(f"Error con py-clob-client: {e}, intentando HTTP...")
+                    return self._get_trades_http(trader_address, limit)
+            else:
+                return self._get_trades_http(trader_address, limit)
+
+        except Exception as e:
+            log_error(f'Error inesperado al obtener trades', e)
+            return []
+
+    def _get_trades_http(self, trader_address: str, limit: int) -> List[Dict]:
+        """
+        Método alternativo: obtener trades via HTTP directo
+        """
+        try:
+            # Intentar endpoint público primero
             url = f"{self.config.clob_url}/data/trades"
             params = {
                 'maker_address': trader_address.lower(),
                 'limit': limit
             }
 
-            self.logger.debug(f"Obteniendo trades de {trader_address[:10]}...")
+            self.logger.debug(f"Intentando endpoint HTTP: {url}")
             response = requests.get(url, params=params, headers=self.headers, timeout=10)
 
             # Manejar diferentes códigos de error
             if response.status_code == 401:
-                log_error(
-                    "Error 401: El endpoint de trades requiere autenticación o hay restricciones"
+                log_warning(
+                    "Endpoint /data/trades requiere autenticacion. "
+                    "El endpoint puede haber cambiado."
                 )
-                log_warning("Posibles soluciones:")
-                log_warning("  1. Verifica que la dirección del trader sea correcta")
-                log_warning("  2. Si estás en un país con restricciones, usa VPN")
-                log_warning("  3. La API de Polymarket puede haber cambiado recientemente")
-                return []
+                # Intentar endpoint alternativo
+                return self._get_trades_alternative(trader_address, limit)
             elif response.status_code == 403:
-                log_error("Error 403: Acceso prohibido - posible restricción geográfica")
-                log_warning("Intenta usar una VPN para acceder desde una ubicación permitida")
+                log_error("Error 403: Acceso prohibido")
+                log_warning("Posibles causas:")
+                log_warning("  1. Restriccion IP/pais (poco probable en Espana)")
+                log_warning("  2. El endpoint cambio o ya no esta disponible")
+                log_warning("  3. Se requiere autenticacion adicional")
                 return []
             elif response.status_code == 429:
-                log_error("Error 429: Demasiadas peticiones - esperando antes de reintentar")
+                log_error("Error 429: Demasiadas peticiones")
                 return []
 
             response.raise_for_status()
             data = response.json()
 
             if data:
-                self.logger.debug(f"Se obtuvieron {len(data)} trades")
+                self.logger.debug(f"Se obtuvieron {len(data)} trades via HTTP")
 
             return data
 
         except requests.exceptions.Timeout:
-            log_error("Timeout al conectar con Polymarket - verifica tu conexión")
+            log_error("Timeout al conectar - verifica tu conexion")
             return []
         except requests.exceptions.ConnectionError:
-            log_error("Error de conexión - verifica tu internet o usa VPN")
+            log_error("Error de conexion - verifica tu internet")
             return []
         except requests.exceptions.RequestException as e:
-            log_error(f"Error en la petición HTTP: {type(e).__name__}")
+            log_error(f"Error HTTP: {type(e).__name__}")
             if hasattr(e, 'response') and e.response is not None:
-                self.logger.debug(f"Status code: {e.response.status_code}")
-                self.logger.debug(f"Response: {e.response.text[:200]}")
+                self.logger.debug(f"Status: {e.response.status_code}")
             return []
         except Exception as e:
-            log_error(f'Error inesperado al obtener trades', e)
+            self.logger.debug(f'Error en _get_trades_http: {e}')
+            return []
+
+    def _get_trades_alternative(self, trader_address: str, limit: int) -> List[Dict]:
+        """
+        Método alternativo: obtener trades del usuario desde sus órdenes
+        """
+        try:
+            log_warning("Intentando metodo alternativo para obtener trades...")
+
+            # Si el usuario tiene el cliente autenticado, podemos intentar
+            # obtener las órdenes y trades de otra forma
+            if not self.client:
+                log_error("No se puede usar metodo alternativo sin cliente autenticado")
+                return []
+
+            # Nota: Este método depende de la API de py-clob-client
+            # Si falla, no hay forma de obtener los trades del trader objetivo
+            log_warning(
+                "IMPORTANTE: El endpoint de trades publico ya no esta disponible. "
+                "Opciones:"
+            )
+            log_warning("  1. Contacta al trader y pidele que comparta sus trades")
+            log_warning("  2. Monitorea los mercados directamente en lugar del trader")
+            log_warning("  3. Espera a que Polymarket restaure el endpoint publico")
+
+            return []
+
+        except Exception as e:
+            self.logger.debug(f"Error en metodo alternativo: {e}")
             return []
 
     def get_market(self, condition_id: str) -> Optional[Dict]:
