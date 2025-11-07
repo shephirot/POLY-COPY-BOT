@@ -51,7 +51,17 @@ YOUR_POLYMARKET_ADDRESS=0xabcdefabcdefabcdefabcdefabcdefabcdefabcd
 YOUR_PRIVATE_KEY=0xfedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
 
 # 4. Configuración de riesgo (IMPORTANTE)
-COPY_SIZE_MULTIPLIER=0.3    # Copia solo el 30% del tamaño
+# Elige entre modo porcentaje o stake fijo:
+
+# OPCIÓN A - Modo Porcentaje (copia un % del trader)
+COPY_MODE=percentage
+COPY_SIZE_MULTIPLIER=0.3    # Copia solo el 30% del tamaño del trader
+
+# OPCIÓN B - Modo Stake Fijo (copia siempre con el mismo monto)
+# COPY_MODE=fixed
+# FIXED_STAKE_SIZE=10        # Siempre apuestas $10 por trade
+
+# Límites de protección
 MIN_ORDER_SIZE=1            # Mínimo $1
 MAX_ORDER_SIZE=50           # Máximo $50 (protección de riesgo)
 MAX_SLIPPAGE=0.02          # 2% de slippage máximo
@@ -83,7 +93,7 @@ Verás algo como:
 
 Configuración:
   Trader objetivo: 0x1234abcd...
-  Multiplicador de tamaño: 0.3x
+  Modo de copiado: PORCENTAJE (0.3x del tamaño del trader)
   Modo: DRY RUN (Simulación)
 
 ⚠️  MODO DRY RUN ACTIVADO - No se ejecutarán trades reales
@@ -147,7 +157,10 @@ Para ver estadísticas, presiona `Ctrl+C` para detener el bot:
 
 ### Configuración de Riesgo
 
+**Modo Porcentaje - Para seguir proporcionalmente al trader:**
 ```env
+COPY_MODE=percentage
+
 # Para traders conservadores
 COPY_SIZE_MULTIPLIER=0.2    # Solo 20% del tamaño
 MAX_ORDER_SIZE=25           # Máximo $25
@@ -160,6 +173,25 @@ MAX_ORDER_SIZE=100          # Máximo $100
 COPY_SIZE_MULTIPLIER=1.0    # 100% del tamaño
 MAX_ORDER_SIZE=500          # Máximo $500
 ```
+
+**Modo Stake Fijo - Para control total del riesgo:**
+```env
+COPY_MODE=fixed
+
+# Para traders conservadores
+FIXED_STAKE_SIZE=5          # $5 por trade
+MAX_ORDER_SIZE=10           # Máximo $10
+
+# Para traders balanceados
+FIXED_STAKE_SIZE=15         # $15 por trade
+MAX_ORDER_SIZE=20           # Máximo $20
+
+# Para traders agresivos
+FIXED_STAKE_SIZE=50         # $50 por trade
+MAX_ORDER_SIZE=75           # Máximo $75
+```
+
+📖 **[Guía completa de modos →](MODOS_COPIADO.md)** - Aprende cuál modo es mejor para ti
 
 ### Filtros Útiles
 

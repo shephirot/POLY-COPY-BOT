@@ -45,7 +45,13 @@ export class CopyTradingBot {
     logger.info(chalk.bold('Configuración:'));
     logger.info(`  Trader objetivo: ${chalk.yellow(this.config.targetTraderAddress.substring(0, 10) + '...')}`);
     logger.info(`  Tu dirección: ${chalk.yellow(this.config.yourPolymarketAddress.substring(0, 10) + '...')}`);
-    logger.info(`  Multiplicador de tamaño: ${chalk.yellow(this.config.copySizeMultiplier + 'x')}`);
+
+    if (this.config.copyMode === 'percentage') {
+      logger.info(`  Modo de copiado: ${chalk.cyan('PORCENTAJE')} (${chalk.yellow(this.config.copySizeMultiplier + 'x')} del tamaño del trader)`);
+    } else {
+      logger.info(`  Modo de copiado: ${chalk.cyan('STAKE FIJO')} (${chalk.yellow('$' + this.config.fixedStakeSize)} por trade)`);
+    }
+
     logger.info(`  Tamaño min/max: ${chalk.yellow('$' + this.config.minOrderSize + ' - $' + this.config.maxOrderSize)}`);
     logger.info(`  Slippage máximo: ${chalk.yellow((this.config.maxSlippage * 100).toFixed(1) + '%')}`);
     logger.info(`  Intervalo de polling: ${chalk.yellow(this.config.pollInterval + 'ms')}`);
@@ -216,20 +222,37 @@ export class CopyTradingBot {
     const originalSize = parseFloat(trade.size);
     const price = parseFloat(trade.price);
 
-    // Calcular el tamaño ajustado
-    let adjustedSize = originalSize * this.config.copySizeMultiplier;
-    const orderValue = adjustedSize * price;
+    // Calcular el tamaño ajustado según el modo
+    let adjustedSize: number;
+    let orderValue: number;
+
+    if (this.config.copyMode === 'percentage') {
+      // Modo porcentaje: copiar un % del tamaño del trader
+      adjustedSize = originalSize * this.config.copySizeMultiplier;
+      orderValue = adjustedSize * price;
+
+      logger.debug(`  ↳ Modo porcentaje: ${originalSize} × ${this.config.copySizeMultiplier} = ${adjustedSize.toFixed(2)} tokens`);
+    } else {
+      // Modo fixed: usar un stake fijo en USDC
+      orderValue = this.config.fixedStakeSize;
+      adjustedSize = orderValue / price;
+
+      logger.debug(`  ↳ Modo stake fijo: $${this.config.fixedStakeSize} ÷ $${price} = ${adjustedSize.toFixed(2)} tokens`);
+    }
 
     // Validar límites de tamaño
     if (orderValue < this.config.minOrderSize) {
-      logger.debug(`  ↳ Orden muy pequeña: $${orderValue.toFixed(2)}`);
+      logger.debug(`  ↳ Orden muy pequeña: $${orderValue.toFixed(2)} (mínimo: $${this.config.minOrderSize})`);
       return null;
     }
 
     if (orderValue > this.config.maxOrderSize) {
-      logger.debug(`  ↳ Orden muy grande: $${orderValue.toFixed(2)}, ajustando...`);
+      logger.debug(`  ↳ Orden muy grande: $${orderValue.toFixed(2)}, ajustando a máximo: $${this.config.maxOrderSize}`);
       adjustedSize = this.config.maxOrderSize / price;
+      orderValue = this.config.maxOrderSize;
     }
+
+    logger.debug(`  ↳ Orden final: ${adjustedSize.toFixed(2)} tokens @ $${price} = $${orderValue.toFixed(2)}`);
 
     return {
       tokenId: trade.asset_id,

@@ -5,8 +5,11 @@ Bot profesional de copy trading para Polymarket que replica automáticamente las
 ## ✨ Características
 
 - 🔄 **Copy Trading en Tiempo Real**: Monitorea y replica trades automáticamente
+- 🎯 **Dos Modos de Copiado**:
+  - **Porcentaje**: Copia un % del tamaño del trader (ej: 50%)
+  - **Stake Fijo**: Copia siempre con el mismo monto (ej: $10 por trade)
 - 🛡️ **Gestión de Riesgo**: Límites configurables de tamaño, slippage y filtros de mercado
-- 🎯 **Filtros Avanzados**: Whitelist/Blacklist de mercados, filtros por tipo de operación
+- 🎲 **Filtros Avanzados**: Whitelist/Blacklist de mercados, filtros por tipo de operación
 - 🔁 **Sistema de Reintentos**: Manejo robusto de errores con reintentos automáticos
 - 📊 **Estadísticas en Tiempo Real**: Tracking completo de performance del bot
 - 🧪 **Modo Dry Run**: Prueba el bot sin riesgo antes de operar con dinero real
@@ -54,10 +57,12 @@ YOUR_POLYMARKET_ADDRESS=0x5678...
 # REQUERIDO: Tu clave privada (¡NUNCA LA COMPARTAS!)
 YOUR_PRIVATE_KEY=0xabcd...
 
-# RECOMENDADO: Ajusta estos parámetros según tu estrategia
-COPY_SIZE_MULTIPLIER=0.5  # 50% del tamaño del trader
+# RECOMENDADO: Elige tu modo de copiado
+COPY_MODE=percentage       # "percentage" o "fixed"
+COPY_SIZE_MULTIPLIER=0.5   # Si usas percentage: 50% del tamaño
+FIXED_STAKE_SIZE=10        # Si usas fixed: $10 por trade
 MAX_ORDER_SIZE=100         # Máximo $100 por orden
-DRY_RUN=true              # Empieza en modo simulación
+DRY_RUN=true               # Empieza en modo simulación
 ```
 
 4. **Compilar el proyecto**
@@ -85,12 +90,30 @@ npm run dev
 | `TARGET_TRADER_ADDRESS` | Dirección del trader a copiar | **REQUERIDO** |
 | `YOUR_POLYMARKET_ADDRESS` | Tu dirección de Polymarket | **REQUERIDO** |
 | `YOUR_PRIVATE_KEY` | Tu clave privada | **REQUERIDO** |
-| `COPY_SIZE_MULTIPLIER` | Multiplicador de tamaño (0.5 = 50%) | 1.0 |
+| `COPY_MODE` | Modo de copiado: `percentage` o `fixed` | percentage |
+| `COPY_SIZE_MULTIPLIER` | Multiplicador (modo percentage) | 1.0 |
+| `FIXED_STAKE_SIZE` | Stake fijo en USDC (modo fixed) | 10 |
 | `MIN_ORDER_SIZE` | Tamaño mínimo de orden (USDC) | 1 |
 | `MAX_ORDER_SIZE` | Tamaño máximo de orden (USDC) | 1000 |
 | `MAX_SLIPPAGE` | Slippage máximo permitido | 0.02 (2%) |
 | `POLL_INTERVAL` | Intervalo de polling (ms) | 5000 |
 | `DRY_RUN` | Modo simulación | true |
+
+### 🎯 Modos de Copiado
+
+El bot soporta dos estrategias diferentes:
+
+**Modo Porcentaje** (`COPY_MODE=percentage`):
+- Copia un % del tamaño del trader
+- Ejemplo: `COPY_SIZE_MULTIPLIER=0.5` = copia el 50%
+- Ideal cuando el trader tiene capital similar al tuyo
+
+**Modo Stake Fijo** (`COPY_MODE=fixed`):
+- Copia siempre con el mismo monto
+- Ejemplo: `FIXED_STAKE_SIZE=10` = siempre $10 por trade
+- Ideal para control de riesgo consistente
+
+📖 **[Ver guía completa de modos →](MODOS_COPIADO.md)**
 
 ### Filtros Avanzados
 
@@ -126,9 +149,20 @@ Esto te permitirá ver qué operaciones se copiarían sin ejecutarlas realmente.
 
 ### 3. Configura tu Gestión de Riesgo
 
+Elige tu modo de copiado:
+
+**Opción A - Modo Porcentaje:**
 ```env
+COPY_MODE=percentage
 COPY_SIZE_MULTIPLIER=0.3  # Copia solo 30% del tamaño
 MAX_ORDER_SIZE=50          # No más de $50 por operación
+```
+
+**Opción B - Modo Stake Fijo:**
+```env
+COPY_MODE=fixed
+FIXED_STAKE_SIZE=15        # Siempre $15 por trade
+MAX_ORDER_SIZE=20          # Protección adicional
 ```
 
 ### 4. Activa el Modo Live

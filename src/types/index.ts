@@ -14,7 +14,9 @@ export interface BotConfig {
   gammaApiUrl: string;
 
   // Parámetros de trading
-  copySizeMultiplier: number;
+  copyMode: 'percentage' | 'fixed';
+  copySizeMultiplier: number; // Para modo percentage
+  fixedStakeSize: number; // Para modo fixed (en USDC)
   minOrderSize: number;
   maxOrderSize: number;
   maxSlippage: number;

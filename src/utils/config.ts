@@ -35,6 +35,13 @@ export function loadConfig(): BotConfig {
     ? process.env.COPY_SIDES.split(',').map(s => s.trim())
     : ['BUY', 'SELL'];
 
+  // Validar y parsear modo de copiado
+  const copyMode = (process.env.COPY_MODE || 'percentage').toLowerCase();
+  if (copyMode !== 'percentage' && copyMode !== 'fixed') {
+    logError('COPY_MODE debe ser "percentage" o "fixed"');
+    process.exit(1);
+  }
+
   const config: BotConfig = {
     targetTraderAddress: process.env.TARGET_TRADER_ADDRESS!,
     yourPolymarketAddress: process.env.YOUR_POLYMARKET_ADDRESS!,
@@ -44,7 +51,9 @@ export function loadConfig(): BotConfig {
     clobChainId: parseInt(process.env.CLOB_CHAIN_ID || '137'),
     gammaApiUrl: process.env.GAMMA_API_URL || 'https://gamma-api.polymarket.com',
 
+    copyMode: copyMode as 'percentage' | 'fixed',
     copySizeMultiplier: parseFloat(process.env.COPY_SIZE_MULTIPLIER || '1.0'),
+    fixedStakeSize: parseFloat(process.env.FIXED_STAKE_SIZE || '10'),
     minOrderSize: parseFloat(process.env.MIN_ORDER_SIZE || '1'),
     maxOrderSize: parseFloat(process.env.MAX_ORDER_SIZE || '1000'),
     maxSlippage: parseFloat(process.env.MAX_SLIPPAGE || '0.02'),
@@ -64,9 +73,16 @@ export function loadConfig(): BotConfig {
   };
 
   // Validaciones
-  if (config.copySizeMultiplier <= 0) {
-    logError('COPY_SIZE_MULTIPLIER debe ser mayor que 0');
-    process.exit(1);
+  if (config.copyMode === 'percentage') {
+    if (config.copySizeMultiplier <= 0) {
+      logError('COPY_SIZE_MULTIPLIER debe ser mayor que 0 (modo percentage)');
+      process.exit(1);
+    }
+  } else if (config.copyMode === 'fixed') {
+    if (config.fixedStakeSize <= 0) {
+      logError('FIXED_STAKE_SIZE debe ser mayor que 0 (modo fixed)');
+      process.exit(1);
+    }
   }
 
   if (config.minOrderSize < 0 || config.maxOrderSize < config.minOrderSize) {
