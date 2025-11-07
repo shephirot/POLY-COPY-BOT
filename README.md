@@ -2,6 +2,41 @@
 
 Bot profesional de copy trading para Polymarket que replica automáticamente las operaciones de traders exitosos en tiempo real.
 
+## 🎭 Dos Versiones Disponibles
+
+Este bot está disponible en **dos lenguajes**. Elige el que prefieras:
+
+| | 🐍 **Python** | 📘 **TypeScript** |
+|---|---|---|
+| **Facilidad** | ⭐⭐⭐⭐⭐ Muy fácil | ⭐⭐⭐ Media |
+| **Instalación** | `pip install` | `npm install` |
+| **Compilación** | ❌ No necesita | ✅ `npm run build` |
+| **Ejecutar** | `python main.py` | `npm start` |
+| **Mejor para** | Principiantes, traders | Desarrolladores JS/TS |
+| **Características** | ✅ Todas | ✅ Todas |
+
+### 🐍 Versión Python (Recomendada si no conoces Node.js)
+
+```bash
+cd python
+pip install -r ../requirements.txt
+python main.py
+```
+
+📖 **[Ver guía completa de Python →](python/README_PYTHON.md)**
+
+### 📘 Versión TypeScript/Node.js
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+📖 **Sigue leyendo este README para instrucciones de TypeScript**
+
+---
+
 ## ✨ Características
 
 - 🔄 **Copy Trading en Tiempo Real**: Monitorea y replica trades automáticamente
@@ -15,7 +50,9 @@ Bot profesional de copy trading para Polymarket que replica automáticamente las
 - 🧪 **Modo Dry Run**: Prueba el bot sin riesgo antes de operar con dinero real
 - 📝 **Logging Profesional**: Sistema de logs completo con niveles configurables
 
-## 🚀 Instalación Rápida
+## 🚀 Instalación Rápida (TypeScript)
+
+> 💡 **¿Prefieres Python?** Ve a [python/README_PYTHON.md](python/README_PYTHON.md) para instrucciones más simples.
 
 ### Prerrequisitos
 
