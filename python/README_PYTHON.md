@@ -58,6 +58,52 @@ python main.py
 
 ¡Ya está! No hay paso de compilación.
 
+## ✅ Validar Configuración (RECOMENDADO)
+
+Antes de ejecutar el bot, valida tu configuración:
+
+```bash
+python validate_config.py
+```
+
+Este script verifica:
+- ✓ Que el archivo `.env` existe
+- ✓ Que todas las direcciones son válidas
+- ✓ Que la clave privada tiene el formato correcto
+- ✓ Que los parámetros de trading son correctos
+- ✓ Detecta si estás en modo auto-test (misma wallet)
+
+**Salida ejemplo:**
+```
+✓ Archivo .env encontrado
+✓ TARGET_TRADER_ADDRESS: 0x1234...abcd
+✓ YOUR_POLYMARKET_ADDRESS: 0x1234...abcd
+✓ YOUR_PRIVATE_KEY: 0x12ab...cd (longitud correcta)
+✓ COPY_MODE: fixed
+  → Stake fijo: $10 por trade
+✓ VALIDACIÓN EXITOSA
+```
+
+## 🧪 Probar el Bot (Auto-Test)
+
+¿Quieres probar el bot antes de copiar a otros traders?
+
+**Lee la guía completa:** [GUIA_TEST.md](GUIA_TEST.md)
+
+Resumen rápido:
+1. En `.env`, usa TU dirección en ambos campos:
+   ```env
+   TARGET_TRADER_ADDRESS=0xTU_DIRECCION
+   YOUR_POLYMARKET_ADDRESS=0xTU_DIRECCION
+   DRY_RUN=true
+   LOG_LEVEL=DEBUG
+   ```
+2. Ejecuta: `python main.py`
+3. Haz un trade en Polymarket
+4. El bot debería detectarlo en 5-10 segundos
+
+**Ver guía completa con screenshots y troubleshooting:** [GUIA_TEST.md](GUIA_TEST.md)
+
 ## 📦 Dependencias
 
 ```
@@ -191,6 +237,15 @@ print(f'Total trades: {len(trades)}')
 
 ## 🐛 Solución de Problemas
 
+**📘 Guía Completa:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+### Errores Comunes (Ya Corregidos ✅)
+
+- ✅ **Error UnicodeEncodeError en Windows** - Arreglado (símbolos ASCII)
+- ✅ **Error 401 Unauthorized** - Arreglado (cliente autenticado)
+- ✅ **Error Timestamp KeyError** - Arreglado (manejo robusto)
+- ✅ **Auto-test con propia wallet** - Funcionando
+
 ### Error: `ModuleNotFoundError: No module named 'py_clob_client'`
 
 ```bash
@@ -212,11 +267,18 @@ Asegúrate de que `.env` esté en el directorio raíz (un nivel arriba de `pytho
 ls ../.env    # Debe existir
 ```
 
-### Colores no se muestran en Windows
+### El bot no detecta trades
 
-```bash
-pip install colorama --upgrade
-```
+1. Ejecuta el validador: `python validate_config.py`
+2. Verifica que usas la dirección correcta (de tu perfil Polymarket, no de blockchain)
+3. Activa DEBUG: `LOG_LEVEL=DEBUG` en `.env`
+4. Lee la guía: [GUIA_TEST.md](GUIA_TEST.md)
+
+### Más Ayuda
+
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Guía completa de errores
+- [GUIA_TEST.md](GUIA_TEST.md) - Guía de testing paso a paso
+- `bot.log` - Revisa los logs del bot
 
 ## 🎓 Ejemplos de Uso
 
@@ -332,9 +394,16 @@ sudo systemctl start polybot
 
 ## 📚 Recursos
 
-- [Documentación de py-clob-client](https://github.com/Polymarket/py-clob-client)
-- [API de Polymarket](https://docs.polymarket.com/)
-- [Guía completa de modos](../MODOS_COPIADO.md) (compartida con TypeScript)
+### Documentación del Bot
+- [GUIA_TEST.md](GUIA_TEST.md) - Cómo probar el bot con tu propia wallet
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Solución de problemas comunes
+- [MODOS_COPIADO.md](../MODOS_COPIADO.md) - Guía de modos (Porcentaje vs Fijo)
+- `validate_config.py` - Script para validar tu configuración
+
+### Documentación Externa
+- [py-clob-client](https://github.com/Polymarket/py-clob-client) - Cliente oficial de Python
+- [Polymarket API](https://docs.polymarket.com/) - Documentación de la API
+- [Polymarket Leaderboard](https://polymarket.com/leaderboard) - Encuentra traders para copiar
 
 ## 🤝 Contribuir
 
